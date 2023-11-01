@@ -405,7 +405,7 @@ extends IterableOnce[T @uncheckedVariance]
    *  different partitions sequentially, using `seqop` to update the result, and then
    *  applies `combop` to results from different partitions. The implementation of this
    *  operation may operate on an arbitrary number of collection partitions, so `combop`
-   *  may be invoked arbitrary number of times.
+   *  may be invoked arbitrary number of times. 
    *
    *  For example, one might want to process some elements and then produce a `Set`. In this
    *  case, `seqop` would process an element and append it to the set, while `combop`
@@ -418,12 +418,30 @@ extends IterableOnce[T @uncheckedVariance]
    *
    *  Another example is calculating geometric mean from a collection of doubles
    *  (one would typically require big doubles for this).
+   * 
+   *  For the result to be deterministic, we require the following law. For all seq1, seq2:
+   *  {{{
+   *    (seq1 ++ seq2).foldLeft(z)(seqop) == combop(seq1.foldLeft(z)(seqop), seq2.foldLeft(z)(seqop))
+   *  }}}    
+   *  Under this condition, aggregate returns foldLeft(z)(seqop).
+   * 
+   *  A sufficient pair of conditions that ensure the above is:
+   *  {{{
+   *    combop(b1, seqop(b2,a)) == seqop(combop(b1, b2), a)
+   *    combop(a, z) == a
+   *  }}}
+   *  An implementation of aggregate that ensures each partition has size at least k can replace
+   *  the last (right identity) law with the condition that for all seq2 where seq2.size == k,
+   *  {{{
+   *    combop(b, seq2.foldLeft(z)(seqop)) == seq2.foldLeft(b)(seqop)
+   *  }}}
+   *  For example, if aggregate implementation only partitions into non-empty list, we require 
+   *  {{{
+   *    combop(b, seqop(z,a)) == seqop(b,a)
+   *  }}}
    *
    *  @tparam S        the type of accumulated results
-   *  @param z         the initial value for the accumulated result of the partition - this
-   *                   will typically be the neutral element for the `seqop` operator (e.g.
-   *                   `Nil` for list concatenation or `0` for summation) and may be evaluated
-   *                   more than once
+   *  @param z         the initial value for the accumulated result of the partition
    *  @param seqop     an operator used to accumulate results within a partition
    *  @param combop    an associative operator used to combine results from different partitions
    */
